@@ -31,7 +31,7 @@ export default function DivisionTab({ members }: { members: Member[] }) {
 
   return (
     <div className="pb-16 animate-fade-in">
-      <h2 className="text-lg font-bold mb-3 text-gray-800">班分けの実行（担当者用）</h2>
+      <h2 className="text-lg font-bold mb-3 text-gray-800">グループ分け</h2>
       
       <div className="bg-white rounded-xl p-4 shadow-sm mb-4">
         <div className="flex justify-between items-center mb-4">
@@ -45,8 +45,8 @@ export default function DivisionTab({ members }: { members: Member[] }) {
 
         <div className="text-sm font-bold text-gray-600 mb-2">分散モード</div>
         <div className="flex bg-gray-100 rounded-lg p-1 mb-5">
-          <button onClick={() => setDivMode('random')} className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${divMode === 'random' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-400'}`}>🎲 ランダム</button>
-          <button onClick={() => setDivMode('core')} className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${divMode === 'core' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-400'}`}>👑 幹部分散</button>
+          <button onClick={() => setDivMode('random')} className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${divMode === 'random' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-400'}`}>🎲 全員ランダム</button>
+          <button onClick={() => setDivMode('core')} className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${divMode === 'core' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-400'}`}>👑 幹部を分散</button>
         </div>
 
         <div className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-100">
