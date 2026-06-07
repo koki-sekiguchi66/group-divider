@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Toaster } from 'sonner'
 import RegistrationTab from './components/RegistrationTab';
 import CheckInTab from './components/CheckInTab';
 import DivisionTab from './components/DivisionTab';
@@ -16,7 +17,7 @@ export default function App() {
     const urlData = decodeMembersFromUrl();
     if (urlData) {
       setMembers(urlData);
-      setTab('checkin'); // URLからデータを受け取ったら自動でチェックインタブへ遷移
+      setTab('registration'); 
       window.history.replaceState({}, document.title, window.location.pathname);
     } else {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -35,6 +36,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#f3f4f6] text-gray-900 font-sans selection:bg-emerald-200">
+      <Toaster position="top-right" richColors />
       <header className="bg-emerald-600 text-white p-4 text-center sticky top-0 z-20 shadow">
         <h1 className="text-lg font-black tracking-widest">GROUP DIVIDER</h1>
       </header>
@@ -55,7 +57,7 @@ export default function App() {
       <main className="max-w-md mx-auto p-4 pt-6">
         {/* 
           タブ切り替え時にコンポーネントを破棄（アンマウント）させず、
-          CSSの display: none (hidden) で隠すことで班分け結果や入力途中の状態を完全に維持します。
+          CSSの display: none (hidden) で隠すことで班分け結果や入力途中の状態を完全に維持
         */}
         <div className={tab === 'registration' ? 'block' : 'hidden'}>
           <RegistrationTab members={members} setMembers={setMembers} />

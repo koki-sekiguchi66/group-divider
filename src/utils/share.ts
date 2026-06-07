@@ -1,10 +1,21 @@
-// @ts-ignore - 型定義がない場合のコンパイルエラーを防ぐ
 import LZString from 'lz-string';
-import { type Member } from '../types';
+import { type Member, type Gender } from '../types';
+
+// 性別と数値を相互変換するためのマッピング定義
+const GENDER_MAP: Record<Gender, number> = { male: 0, female: 1, other: 2 };
+const REVERSE_GENDER_MAP: Record<number, Gender> = { 0: 'male', 1: 'female', 2: 'other' };
 
 export function encodeMembersToUrl(members: Member[]): string {
-  const jsonStr = JSON.stringify(members);
+  // ① IDや出欠情報を捨て[名前, 性別番号, 幹部フラグ(0|1)] に変換
+  const minimalData = members.map(m => [
+    m.name,
+    GENDER_MAP[m.gender],
+    m.core ? 1 : 0
+  ]);
+  
+  const jsonStr = JSON.stringify(minimalData);
   const compressed = LZString.compressToEncodedURIComponent(jsonStr);
+  
   const url = new URL(window.location.href);
   url.searchParams.set('data', compressed);
   return url.toString();
@@ -19,8 +30,16 @@ export function decodeMembersFromUrl(): Member[] | null {
     const jsonStr = LZString.decompressFromEncodedURIComponent(compressed);
     if (!jsonStr) return null;
     const parsed = JSON.parse(jsonStr);
+    
     if (Array.isArray(parsed)) {
-      return parsed;
+      // ② 最小データからアプリ内で必要な Member オブジェクトの形式へ再構築
+      return parsed.map((item: any) => ({
+        id: Math.random().toString(36).slice(2, 10), // IDは復元時に新規発行
+        name: item[0],
+        gender: REVERSE_GENDER_MAP[item[1]] || 'male',
+        core: item[2] === 1,
+        checkedIn: false 
+      }));
     }
   } catch (e) {
     console.error("URLデータのパースに失敗しました", e);

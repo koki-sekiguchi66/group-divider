@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { toast } from 'sonner';
 import { type Member, type Gender } from '../types';
 import { encodeMembersToUrl } from '../utils/share';
 
@@ -15,7 +16,6 @@ export default function RegTab({ members, setMembers }: Props) {
   const [newName, setNewName] = useState('');
   const [newGender, setNewGender] = useState<Gender>('male');
   const [newCore, setNewCore] = useState(false);
-  const [showToast, setShowToast] = useState(false);
 
   // ラジオボタン用コンポーネント
   const GenderRadios = ({ current, onChange }: { current: Gender, onChange: (gender: Gender) => void }) => (
@@ -119,8 +119,9 @@ export default function RegTab({ members, setMembers }: Props) {
     if (members.length === 0) return alert('共有するメンバーがいません');
     const url = encodeMembersToUrl(members);
     await navigator.clipboard.writeText(url);
-    setShowToast(true);
-    setTimeout(() => setShowToast(false), 3000);
+    toast.success('共有URLをコピーしました！', {
+      description: 'URLにアクセスすると登録済みメンバーが反映されます',
+    });
   };
 
   return (
@@ -128,7 +129,13 @@ export default function RegTab({ members, setMembers }: Props) {
       {/* CSVインポートブロック */}
       <div className="bg-white rounded-xl p-4 mb-3 shadow-sm border border-gray-100">
         <label className="block text-xs font-bold text-gray-500 mb-2">GoogleフォームのCSVから一括インポート</label>
-        <input type="file" accept=".csv" onChange={handleCSV} className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100" />
+        <input 
+          type="file" 
+          // 複数のMIMEタイプと拡張子を明示的に指定
+          accept=".csv, text/csv, application/vnd.ms-excel, application/csv" 
+          onChange={handleCSV} 
+          className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100" 
+        />
       </div>
 
       {/* 手動追加フォームブロック */}
@@ -188,14 +195,7 @@ export default function RegTab({ members, setMembers }: Props) {
           🔗 URLをコピーして登録済みメンバーを共有
         </button>
       </div>
-
-      {/* 共有時のカスタムトースト通知 */}
-      {showToast && (
-        <div className="fixed top-20 right-4 z-50 w-full max-w-xs bg-emerald-600 text-white p-5 rounded-2xl shadow-2xl animate-fade-in-up text-center">
-          <div className="text-xl font-black mb-1">共有URLをコピーしました！</div>
-          <div className="text-sm font-bold opacity-90">URLにアクセスすると登録済みメンバーが反映されます</div>
-        </div>
-      )}
+      
     </div>
   );
 }
