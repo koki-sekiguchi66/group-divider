@@ -17,6 +17,7 @@ export default function App() {
     const urlData = decodeMembersFromUrl();
     if (urlData) {
       setMembers(urlData);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(urlData));
       setTab('registration'); 
       window.history.replaceState({}, document.title, window.location.pathname);
     } else {
