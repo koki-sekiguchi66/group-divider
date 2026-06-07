@@ -7,6 +7,15 @@ services:
       - .:/app
     command: npm run dev -- --host
 
+  test:
+    build: .
+    volumes:
+      - .:/app
+      - node_modules_test:/app/node_modules  # コンテナ内の node_modules を保護
+    command: npm test
+
 volumes:
   node_modules:
+    driver: local
+  node_modules_test:
     driver: local
