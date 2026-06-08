@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <defs>
+    <linearGradient id="blueGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6"/> <stop offset="100%" stop-color="#1e3a8a"/> </linearGradient>
+
+    <linearGradient id="purpleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#a855f7"/> <stop offset="100%" stop-color="#4c1d95"/> </linearGradient>
+
+    <linearGradient id="amberGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#facc15"/> <stop offset="100%" stop-color="#ea580c"/> </linearGradient>
+
+    <mask id="slashMask">
+      <rect width="120" height="120" fill="white" />
+      <polygon points="0,-6 0,6 120,126 120,114" fill="black" />
+    </mask>
+  </defs>
+
+  <g mask="url(#slashMask)">
+    
+    <polygon points="45,15 90,60 45,105 0,60" fill="url(#blueGrad)" />
+    
+    <polygon points="75,15 120,60 75,105 30,60" fill="url(#purpleGrad)" />
+    
+    <polygon points="60,30 90,60 60,90 30,60" fill="url(#amberGrad)" />
+    
+  </g>
+</svg>

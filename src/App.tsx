@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Toaster } from 'sonner'
+import { motion } from 'motion/react';
 import RegistrationTab from './components/RegistrationTab';
 import CheckInTab from './components/CheckInTab';
 import DivisionTab from './components/DivisionTab';
@@ -8,49 +9,77 @@ import { decodeMembersFromUrl } from './utils/share';
 
 const STORAGE_KEY = 'group-divider-v4';
 
-export default function App() {
-  const [tab, setTab] = useState<'registration' | 'checkin' | 'division'>('registration');
-  const [members, setMembers] = useState<Member[]>([]);
-  const [isLoaded, setIsLoaded] = useState(false);
+type TabId = 'registration' | 'checkin' | 'division';
+const TABS: { id: TabId; label: string }[] = [
+  { id: 'registration', label: '👤 登録' },
+  { id: 'checkin', label: '✅ 受付' },
+  { id: 'division', label: '🎯 班分け' },
+];
 
-  useEffect(() => {
+export default function App() {
+  const [tab, setTab] = useState<TabId>('registration');
+  // 初期メンバーは URL（共有リンク）→ localStorage の順で一度だけ読み込む
+  const [members, setMembers] = useState<Member[]>(() => {
     const urlData = decodeMembersFromUrl();
-    if (urlData) {
-      setMembers(urlData);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(urlData));
-      setTab('registration'); 
-      window.history.replaceState({}, document.title, window.location.pathname);
-    } else {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        try { setMembers(JSON.parse(saved)); } catch (e) { console.error(e); }
-      }
+    if (urlData) return urlData;
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      try { return JSON.parse(saved) as Member[]; } catch (e) { console.error(e); }
     }
-    setIsLoaded(true);
+    return [];
+  });
+
+  // URL から取り込んだ場合のみ、取り込み後に URL を掃除する（保存は下の永続化 effect が担う）
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).has('data')) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
   }, []);
 
+  // members の変更を localStorage に永続化
   useEffect(() => {
-    if (isLoaded) localStorage.setItem(STORAGE_KEY, JSON.stringify(members));
-  }, [members, isLoaded]);
-
-  if (!isLoaded) return null;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(members));
+  }, [members]);
 
   return (
-    <div className="min-h-screen bg-[#f3f4f6] text-gray-900 font-sans selection:bg-emerald-200">
+    <div className="relative min-h-screen text-gray-900 font-sans selection:bg-emerald-200">
+      {/* 背景：固定のソフトグラデ + ぼかしブロブ（すりガラスが屈折する光源） */}
+      <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-gradient-to-br from-emerald-50 via-sky-50 to-violet-100">
+        <motion.div
+          className="absolute -top-24 -left-20 h-72 w-72 rounded-full bg-emerald-300/50 blur-3xl"
+          animate={{ x: [0, 40, 0], y: [0, 30, 0] }}
+          transition={{ duration: 16, repeat: Infinity, ease: 'easeInOut' }}
+        />
+        <motion.div
+          className="absolute top-1/3 -right-24 h-80 w-80 rounded-full bg-sky-300/50 blur-3xl"
+          animate={{ x: [0, -35, 0], y: [0, 30, 0] }}
+          transition={{ duration: 20, repeat: Infinity, ease: 'easeInOut' }}
+        />
+        <motion.div
+          className="absolute -bottom-16 left-1/4 h-72 w-72 rounded-full bg-violet-300/40 blur-3xl"
+          animate={{ x: [0, 25, 0], y: [0, -25, 0] }}
+          transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
+        />
+      </div>
+
       <Toaster position="top-right" richColors />
-      <header className="bg-emerald-600 text-white p-4 text-center sticky top-0 z-20 shadow">
-        <h1 className="text-lg font-black tracking-widest">GROUP DIVIDER</h1>
+
+      <header className="sticky top-0 z-20 border-b border-white/40 bg-white/60 p-4 text-center backdrop-blur-xl">
+        <h1 className="text-lg font-black tracking-[0.3em] text-emerald-700">GROUP DIVIDER</h1>
       </header>
 
-      <nav className="flex bg-white shadow-sm border-b sticky top-[60px] z-10">
-        {[
-          { id: 'registration', label: '👤 登録' },
-          { id: 'checkin', label: '✅ 受付' },
-          { id: 'division', label: '🎯 班分け' }
-        ].map(t => (
-          <button key={t.id} onClick={() => setTab(t.id as any)}
-            className={`flex-1 py-3 text-sm font-bold border-b-2 transition-colors ${tab === t.id ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-gray-400 hover:bg-gray-50'}`}>
+      <nav className="sticky top-[60px] z-10 flex border-b border-white/40 bg-white/45 backdrop-blur-xl">
+        {TABS.map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)}
+            className={`relative flex-1 py-3 text-sm font-bold transition-colors ${tab === t.id ? 'text-emerald-600' : 'text-gray-400 hover:text-gray-500'}`}>
             {t.label}
+            {tab === t.id && (
+              <motion.div
+                layoutId="tab-underline"
+                className="absolute left-0 right-0 bottom-0 h-0.5 bg-emerald-500"
+                transition={{ type: 'spring', stiffness: 400, damping: 32 }}
+              />
+            )}
           </button>
         ))}
       </nav>

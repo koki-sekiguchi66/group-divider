@@ -1,9 +1,24 @@
 import React, { useState } from 'react';
 import { toast } from 'sonner';
+import { motion, AnimatePresence } from 'motion/react';
 import { type Member, type Gender } from '../types';
 import { encodeMembersToUrl } from '../utils/share';
 
 interface Props { members: Member[]; setMembers: React.Dispatch<React.SetStateAction<Member[]>>; }
+
+// ラジオボタン用コンポーネント（propsのみに依存するためモジュールスコープに配置）
+function GenderRadios({ current, onChange }: { current: Gender, onChange: (gender: Gender) => void }) {
+  return (
+    <div className="flex gap-3">
+      {(['male', 'female', 'other'] as Gender[]).map(gender => (
+        <label key={gender} className="flex items-center gap-1 cursor-pointer text-sm font-bold text-gray-600">
+          <input type="radio" checked={current === gender} onChange={() => onChange(gender)} className="w-4 h-4 accent-emerald-600"/>
+          {gender === 'male' ? '男' : gender === 'female' ? '女' : '他'}
+        </label>
+      ))}
+    </div>
+  );
+}
 
 export default function RegTab({ members, setMembers }: Props) {
   // インライン編集用のState
@@ -16,18 +31,6 @@ export default function RegTab({ members, setMembers }: Props) {
   const [newName, setNewName] = useState('');
   const [newGender, setNewGender] = useState<Gender>('male');
   const [newCore, setNewCore] = useState(false);
-
-  // ラジオボタン用コンポーネント
-  const GenderRadios = ({ current, onChange }: { current: Gender, onChange: (gender: Gender) => void }) => (
-    <div className="flex gap-3">
-      {(['male', 'female', 'other'] as Gender[]).map(gender => (
-        <label key={gender} className="flex items-center gap-1 cursor-pointer text-sm font-bold text-gray-600">
-          <input type="radio" checked={current === gender} onChange={() => onChange(gender)} className="w-4 h-4 accent-emerald-600"/>
-          {gender === 'male' ? '男' : gender === 'female' ? '女' : '他'}
-        </label>
-      ))}
-    </div>
-  );
 
   // CSVインポート処理
   const handleCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -47,7 +50,7 @@ export default function RegTab({ members, setMembers }: Props) {
       if(nameIdx === -1) nameIdx = 1; 
 
       // ② 「性別」列のインデックスを特定
-      let genderIdx = headers.findIndex(h => h.includes('性別'));
+      const genderIdx = headers.findIndex(h => h.includes('性別'));
       
       const newMembers: Member[] = [];
       for(let i = 1; i < lines.length; i++){
@@ -125,9 +128,9 @@ export default function RegTab({ members, setMembers }: Props) {
   };
 
   return (
-    <div className="pb-16 animate-fade-in relative">
+    <div className="pb-16 relative">
       {/* CSVインポートブロック */}
-      <div className="bg-white rounded-xl p-4 mb-3 shadow-sm border border-gray-100">
+      <div className="glass-card rounded-2xl p-4 mb-3">
         <label className="block text-xs font-bold text-gray-500 mb-2">GoogleフォームのCSVから一括インポート</label>
         <input 
           type="file" 
@@ -139,61 +142,71 @@ export default function RegTab({ members, setMembers }: Props) {
       </div>
 
       {/* 手動追加フォームブロック */}
-      <div className="bg-white rounded-xl p-4 mb-5 shadow-sm border border-gray-100">
+      <div className="glass-card rounded-2xl p-4 mb-5">
         <label className="block text-xs font-bold text-gray-500 mb-3">手動でメンバーを追加</label>
         <div className="space-y-3">
-          <input value={newName} onChange={e => setNewName(e.target.value)} className="w-full border rounded-lg p-2.5 text-sm" placeholder="名前を入力" />
+          <input value={newName} onChange={e => setNewName(e.target.value)} className="glass-input p-2.5 text-sm" placeholder="名前を入力" />
           <GenderRadios current={newGender} onChange={setNewGender} />
-          <label className="flex items-center gap-2 font-bold text-amber-700 bg-amber-50 p-2 rounded-lg text-sm cursor-pointer border border-amber-100">
+          <label className="flex items-center gap-2 font-bold text-amber-700 bg-amber-100/50 backdrop-blur-sm p-2 rounded-xl text-sm cursor-pointer border border-amber-200/60">
             <input type="checkbox" checked={newCore} onChange={e => setNewCore(e.target.checked)} className="w-4 h-4 accent-amber-600"/> ★幹部フラグ
           </label>
-          <button onClick={handleAddManual} className="w-full bg-gray-800 text-white text-sm font-bold py-2.5 rounded-lg">＋ 追加する</button>
+          <motion.button whileTap={{ scale: 0.97 }} onClick={handleAddManual} className="w-full btn-dark text-sm font-bold py-2.5 rounded-xl">＋ 追加する</motion.button>
         </div>
       </div>
 
       {/* メンバーリストヘッダー */}
       <div className="flex justify-between items-center mb-2">
         <div className="text-sm font-bold text-gray-600">登録済み： {members.length}人</div>
-        {members.length > 0 && <button onClick={() => {if(window.confirm('全員削除しますか？')) setMembers([])}} className="text-xs font-bold text-red-500 bg-red-50 px-2.5 py-1.5 rounded">全員削除</button>}
+        {members.length > 0 && <motion.button whileTap={{ scale: 0.95 }} onClick={() => {if(window.confirm('全員削除しますか？')) setMembers([])}} className="text-xs font-bold text-red-600 bg-red-100/60 backdrop-blur-sm border border-red-200/50 px-2.5 py-1.5 rounded-lg">全員削除</motion.button>}
       </div>
 
       {/* メンバーリスト本体 */}
       <div className="space-y-2">
-        {members.map(m => (
-          <div key={m.id} className="bg-white rounded-lg p-3 flex justify-between items-center shadow-sm border border-gray-100">
-            {editingId === m.id ? (
-              <div className="w-full space-y-3">
-                <input value={editName} onChange={e=>setEditName(e.target.value)} className="w-full border rounded p-2 text-sm" />
-                <GenderRadios current={editGender} onChange={setEditGender} />
-                <label className="flex items-center gap-1 font-bold text-amber-700 text-sm cursor-pointer">
-                  <input type="checkbox" checked={editCore} onChange={e=>setEditCore(e.target.checked)} className="w-4 h-4 accent-emerald-600"/> ★幹部
-                </label>
-                <div className="flex gap-2">
-                  <button onClick={() => setEditingId(null)} className="flex-1 bg-gray-100 text-sm font-bold py-1.5 rounded">戻る</button>
-                  <button onClick={() => saveEdit(m.id)} className="flex-1 bg-emerald-600 text-white text-sm font-bold py-1.5 rounded">保存</button>
+        <AnimatePresence initial={false}>
+          {members.map(m => (
+            <motion.div
+              key={m.id}
+              layout
+              initial={{ opacity: 0, y: -8, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, x: -24, scale: 0.9 }}
+              transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+              className="glass-card rounded-2xl p-3 flex justify-between items-center"
+            >
+              {editingId === m.id ? (
+                <div className="w-full space-y-3">
+                  <input value={editName} onChange={e=>setEditName(e.target.value)} className="glass-input p-2 text-sm" />
+                  <GenderRadios current={editGender} onChange={setEditGender} />
+                  <label className="flex items-center gap-1 font-bold text-amber-700 text-sm cursor-pointer">
+                    <input type="checkbox" checked={editCore} onChange={e=>setEditCore(e.target.checked)} className="w-4 h-4 accent-emerald-600"/> ★幹部
+                  </label>
+                  <div className="flex gap-2">
+                    <motion.button whileTap={{ scale: 0.96 }} onClick={() => setEditingId(null)} className="flex-1 btn-glass text-sm font-bold py-1.5 rounded-lg">戻る</motion.button>
+                    <motion.button whileTap={{ scale: 0.96 }} onClick={() => saveEdit(m.id)} className="flex-1 btn-primary text-sm font-bold py-1.5 rounded-lg">保存</motion.button>
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <>
-                <div className="flex items-center gap-2">
-                  <span className="font-bold">{m.name}</span>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${m.gender==='male'?'bg-blue-100 text-blue-700':m.gender==='female'?'bg-pink-100 text-pink-700':'bg-gray-100 text-gray-600'}`}>
-                    {m.gender==='male'?'男':m.gender==='female'?'女':'他'}
-                  </span>
-                  {m.core && <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-100 text-amber-700">★幹部</span>}
-                </div>
-                <button onClick={()=>startEdit(m)} className="text-gray-500 text-xs font-bold bg-gray-100 px-2 py-1 rounded">編集</button>
-              </>
-            )}
-          </div>
-        ))}
+              ) : (
+                <>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold">{m.name}</span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${m.gender==='male'?'bg-blue-100 text-blue-700':m.gender==='female'?'bg-pink-100 text-pink-700':'bg-gray-100 text-gray-600'}`}>
+                      {m.gender==='male'?'男':m.gender==='female'?'女':'他'}
+                    </span>
+                    {m.core && <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-100 text-amber-700">★幹部</span>}
+                  </div>
+                  <motion.button whileTap={{ scale: 0.95 }} onClick={()=>startEdit(m)} className="glass-tile text-gray-600 text-xs font-bold px-3 py-1.5 rounded-lg">編集</motion.button>
+                </>
+              )}
+            </motion.div>
+          ))}
+        </AnimatePresence>
       </div>
 
       {/* 共有ボタン */}
-      <div className="mt-8 text-center bg-emerald-50 p-4 border border-emerald-200 border-dashed rounded-xl">
-        <button onClick={copyShareLink} className="w-full bg-emerald-600 text-white font-bold py-3 rounded-lg shadow-sm">
+      <div className="mt-8 text-center bg-white/40 backdrop-blur-md p-4 border border-white/50 rounded-2xl">
+        <motion.button whileTap={{ scale: 0.97 }} onClick={copyShareLink} className="w-full btn-primary font-bold py-3 rounded-xl">
           🔗 URLをコピーして登録済みメンバーを共有
-        </button>
+        </motion.button>
       </div>
       
     </div>

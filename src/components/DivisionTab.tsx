@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { type Member, type DivResult, type DivOptions } from '../types';
 import { divide } from '../core/divider';
+import { resultContainer, teamCard, chipContainer, chip } from '../ui/anim';
 
 export default function DivisionTab({ members }: { members: Member[] }) {
   const [tc, setTc] = useState(3);
@@ -8,6 +10,8 @@ export default function DivisionTab({ members }: { members: Member[] }) {
   const [balG, setBalG] = useState(true);
   const [result, setResult] = useState<DivResult | null>(null);
   const [copied, setCopied] = useState(false);
+  // 再シャッフルのたびに増やし、結果ブロックを再マウントして「配り直し」演出を再生する
+  const [runId, setRunId] = useState(0);
 
   const present = members.filter(m => m.checkedIn);
   const canDivide = present.length >= tc;
@@ -17,6 +21,7 @@ export default function DivisionTab({ members }: { members: Member[] }) {
     const opt: DivOptions = { useCore: divMode === 'core', balG };
     setResult({ teams: divide(present, tc, opt), ...opt });
     setCopied(false);
+    setRunId(n => n + 1);
   };
 
   const copyForLine = async () => {
@@ -30,26 +35,39 @@ export default function DivisionTab({ members }: { members: Member[] }) {
   };
 
   return (
-    <div className="pb-16 animate-fade-in">
+    <div className="pb-16">
       <h2 className="text-lg font-bold mb-3 text-gray-800">グループ分け</h2>
-      
-      <div className="bg-white rounded-xl p-4 shadow-sm mb-4">
+
+      <div className="glass-card rounded-2xl p-4 shadow-sm mb-4">
         <div className="flex justify-between items-center mb-4">
           <div className="text-sm font-bold text-gray-600">作る班の数</div>
           <div className="flex items-center gap-3">
-            <button onClick={() => setTc(Math.max(2, tc - 1))} className="w-9 h-9 bg-gray-100 rounded-lg text-lg font-bold">−</button>
-            <span className="text-2xl font-black w-6 text-center">{tc}</span>
-            <button onClick={() => setTc(Math.min(10, tc + 1))} className="w-9 h-9 bg-gray-100 rounded-lg text-lg font-bold">＋</button>
+            <motion.button whileTap={{ scale: 0.88 }} onClick={() => setTc(Math.max(2, tc - 1))} className="w-9 h-9 glass-tile rounded-xl text-lg font-bold text-gray-700">−</motion.button>
+            <span className="text-2xl font-black w-6 text-center overflow-hidden">
+              <AnimatePresence mode="popLayout" initial={false}>
+                <motion.span
+                  key={tc}
+                  initial={{ y: 14, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  exit={{ y: -14, opacity: 0 }}
+                  transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                  className="inline-block"
+                >
+                  {tc}
+                </motion.span>
+              </AnimatePresence>
+            </span>
+            <motion.button whileTap={{ scale: 0.88 }} onClick={() => setTc(Math.min(10, tc + 1))} className="w-9 h-9 glass-tile rounded-xl text-lg font-bold text-gray-700">＋</motion.button>
           </div>
         </div>
 
         <div className="text-sm font-bold text-gray-600 mb-2">分散モード</div>
-        <div className="flex bg-gray-100 rounded-lg p-1 mb-5">
-          <button onClick={() => setDivMode('random')} className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${divMode === 'random' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-400'}`}>🎲 全員ランダム</button>
-          <button onClick={() => setDivMode('core')} className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${divMode === 'core' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-400'}`}>👑 幹部を分散</button>
+        <div className="flex bg-white/40 backdrop-blur-md border border-white/50 rounded-xl p-1 mb-5">
+          <button onClick={() => setDivMode('random')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${divMode === 'random' ? 'bg-white/90 text-emerald-600 shadow-sm' : 'text-gray-500'}`}>🎲 全員ランダム</button>
+          <button onClick={() => setDivMode('core')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${divMode === 'core' ? 'bg-white/90 text-emerald-600 shadow-sm' : 'text-gray-500'}`}>👑 幹部を分散</button>
         </div>
 
-        <div className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-100">
+        <div className="flex justify-between items-center glass-tile p-3 rounded-xl">
           <div>
             <div className="font-bold text-sm text-gray-700">⚖️ 男女均等</div>
             <div className="text-[10px] text-gray-500">男女を各班に均等に配置</div>
@@ -61,31 +79,53 @@ export default function DivisionTab({ members }: { members: Member[] }) {
         </div>
       </div>
 
-      <button onClick={executeDivide} disabled={!canDivide} className={`w-full py-3.5 rounded-xl font-bold text-white shadow-sm transition-all active:scale-[0.98] ${canDivide ? 'bg-emerald-600' : 'bg-gray-300'}`}>
+      <motion.button
+        whileTap={canDivide ? { scale: 0.97 } : undefined}
+        onClick={executeDivide}
+        disabled={!canDivide}
+        className={`w-full py-3.5 rounded-xl font-bold transition-all ${canDivide ? 'btn-primary' : 'bg-gray-300/70 text-white cursor-not-allowed'}`}
+      >
         グループを生成する
-      </button>
+      </motion.button>
 
       {result && (
-        <div className="mt-8 pt-6 border-t-2 border-dashed border-gray-200 animate-fade-in">
-          <div className="space-y-3">
+        <div className="mt-8 pt-6 border-t-2 border-dashed border-white/60">
+          <motion.div
+            key={runId}
+            variants={resultContainer}
+            initial="hidden"
+            animate="show"
+            className="space-y-3"
+          >
             {result.teams.map((team, i) => (
-              <div key={i} className="bg-white border-2 border-emerald-50 rounded-xl p-4 shadow-sm">
+              <motion.div key={i} variants={teamCard} className="glass-card rounded-2xl p-4">
                 <div className="font-black text-emerald-700 mb-2">{i + 1}班 <span className="text-xs text-gray-400">({team.length}人)</span></div>
-                <div className="flex flex-wrap gap-2">
+                <motion.div variants={chipContainer} className="flex flex-wrap gap-2">
                   {team.map(m => (
-                    <span key={m.id} className="bg-gray-50 border border-gray-100 px-2 py-1 rounded text-sm font-bold text-gray-700">
+                    <motion.span key={m.id} variants={chip} className="glass-tile px-2.5 py-1 rounded-lg text-sm font-bold text-gray-700">
                       {m.core && <span className="text-amber-500 mr-1">★</span>}{m.name}
-                    </span>
+                    </motion.span>
                   ))}
-                </div>
-              </div>
+                </motion.div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
           <div className="flex gap-2 mt-4">
-            <button onClick={executeDivide} className="flex-1 bg-gray-200 text-gray-700 font-bold py-3 rounded-xl text-sm">🔄 再シャッフル</button>
-            <button onClick={copyForLine} className={`flex-1 font-bold py-3 rounded-xl text-white text-sm transition-all ${copied ? 'bg-emerald-500' : 'bg-gray-800'}`}>
-              {copied ? '✅ コピー済み' : '📋 コピーして共有'}
-            </button>
+            <motion.button whileTap={{ scale: 0.96 }} onClick={executeDivide} className="flex-1 btn-glass font-bold py-3 rounded-xl text-sm">🔄 再シャッフル</motion.button>
+            <motion.button whileTap={{ scale: 0.96 }} onClick={copyForLine} className={`flex-1 font-bold py-3 rounded-xl text-white text-sm transition-colors ${copied ? 'btn-primary' : 'btn-dark'}`}>
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.span
+                  key={copied ? 'done' : 'copy'}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.15 }}
+                  className="inline-block"
+                >
+                  {copied ? '✅ コピー済み' : '📋 コピーして共有'}
+                </motion.span>
+              </AnimatePresence>
+            </motion.button>
           </div>
         </div>
       )}

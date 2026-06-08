@@ -29,16 +29,17 @@ export function decodeMembersFromUrl(): Member[] | null {
   try {
     const jsonStr = LZString.decompressFromEncodedURIComponent(compressed);
     if (!jsonStr) return null;
-    const parsed = JSON.parse(jsonStr);
-    
+    const parsed: unknown = JSON.parse(jsonStr);
+
     if (Array.isArray(parsed)) {
-      // ② 最小データからアプリ内で必要な Member オブジェクトの形式へ再構築
-      return parsed.map((item: any) => ({
+      // ② 最小データ [名前, 性別番号, 幹部フラグ] から Member オブジェクトへ再構築
+      const rows = parsed as [string, number, number][];
+      return rows.map((row) => ({
         id: Math.random().toString(36).slice(2, 10), // IDは復元時に新規発行
-        name: item[0],
-        gender: REVERSE_GENDER_MAP[item[1]] || 'male',
-        core: item[2] === 1,
-        checkedIn: false 
+        name: row[0],
+        gender: REVERSE_GENDER_MAP[row[1]] || 'male',
+        core: row[2] === 1,
+        checkedIn: false
       }));
     }
   } catch (e) {
