@@ -9,82 +9,74 @@ function shuffle<T>(array: T[]): T[] {
   return result;
 }
 
-function getTeamSizes(totalSize: number, teamCount: number): number[] {
-  const base = Math.floor(totalSize / teamCount);
-  const remainder = totalSize % teamCount;
-  return Array.from({ length: teamCount }, (_, i) => base + (i < remainder ? 1 : 0));
+// score が最小の班（同点の場合は人数が少ない班）のインデックスを返す
+function pickLeastLoadedTeam(teams: Member[][], score: (team: Member[]) => number = (t) => t.length): number {
+  let best = 0;
+  for (let k = 1; k < teams.length; k++) {
+    if (
+      score(teams[k]) < score(teams[best]) ||
+      (score(teams[k]) === score(teams[best]) && teams[k].length < teams[best].length)
+    ) {
+      best = k;
+    }
+  }
+  return best;
 }
 
 export function divide(members: Member[], teamCount: number, options: DivOptions): Member[][] {
-  const { useCore, balG } = options;
-  const sizes = getTeamSizes(members.length, teamCount);
+  const { useCore, balG, fixedGroups = [] } = options;
   const teams: Member[][] = Array.from({ length: teamCount }, () => []);
-  const cap = [...sizes];
   const placed = new Set<string>();
 
-  // 幹部を各班に分散
-  if (useCore) {
-    const coreMembers = shuffle(members.filter((m) => m.core));
-    let ti = 0;
-    for (const m of coreMembers) {
-      for (let k = 0; k < teamCount; k++) {
-        const t = (ti + k) % teamCount;
-        if (cap[t] > 0) {
-          teams[t].push(m);
-          cap[t]--;
-          placed.add(m.id);
-          ti = (t + 1) % teamCount;
-          break;
-        }
-      }
-    }
+  // 固定グループを配置（人数が多いグループから、最も人数の少ない班へ丸ごと入れる）
+  const groups = shuffle(fixedGroups)
+    .map((ids) => ids.map((id) => members.find((m) => m.id === id)).filter((m): m is Member => !!m))
+    .filter((g) => g.length > 0)
+    .sort((a, b) => b.length - a.length);
+
+  for (const group of groups) {
+    const remaining = group.filter((m) => !placed.has(m.id));
+    if (remaining.length === 0) continue;
+    const t = pickLeastLoadedTeam(teams);
+    teams[t].push(...remaining);
+    remaining.forEach((m) => placed.add(m.id));
   }
 
   const rest = members.filter((m) => !placed.has(m.id));
 
+  // 幹部を各班に分散
+  if (useCore) {
+    const coreMembers = shuffle(rest.filter((m) => m.core));
+    for (const m of coreMembers) {
+      const t = pickLeastLoadedTeam(teams, (team) => team.filter((x) => x.core).length);
+      teams[t].push(m);
+      placed.add(m.id);
+    }
+  }
+
+  const remainder = rest.filter((m) => !placed.has(m.id));
+
   // 男女均等
   if (balG) {
     const byG: Record<string, Member[]> = {
-      male: shuffle(rest.filter((m) => m.gender === 'male')),
-      female: shuffle(rest.filter((m) => m.gender === 'female')),
-      other: shuffle(rest.filter((m) => m.gender === 'other')),
+      male: shuffle(remainder.filter((m) => m.gender === 'male')),
+      female: shuffle(remainder.filter((m) => m.gender === 'female')),
+      other: shuffle(remainder.filter((m) => m.gender === 'other')),
     };
 
     const gs = ['male', 'female', 'other'].sort((a, b) => byG[b].length - byG[a].length);
 
     for (const g of gs) {
       for (const m of byG[g]) {
-        let best = -1;
-        for (let k = 0; k < teamCount; k++) {
-          if (cap[k] <= 0) continue;
-          
-          const getGCount = (team: Member[], gender: string) => team.filter((x) => x.gender === gender).length;
-
-          if (
-            best === -1 ||
-            getGCount(teams[k], g) < getGCount(teams[best], g) ||
-            (getGCount(teams[k], g) === getGCount(teams[best], g) && teams[k].length < teams[best].length)
-          ) {
-            best = k;
-          }
-        }
-        if (best !== -1) {
-          teams[best].push(m);
-          cap[best]--;
-        }
+        const t = pickLeastLoadedTeam(teams, (team) => team.filter((x) => x.gender === g).length);
+        teams[t].push(m);
       }
     }
   } else {
     // 完全ランダム
-    for (const m of shuffle(rest)) {
-      let best = -1;
-      for (let k = 0; k < teamCount; k++) {
-        if (cap[k] > 0 && (best === -1 || cap[k] > cap[best])) best = k;
-      }
-      if (best !== -1) {
-        teams[best].push(m);
-        cap[best]--;
-      }
+    for (const m of shuffle(remainder)) {
+      const t = pickLeastLoadedTeam(teams);
+      teams[t].push(m);
     }
   }
 

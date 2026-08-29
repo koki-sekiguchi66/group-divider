@@ -174,6 +174,68 @@ describe('divide / balG（男女均等）', () => {
   });
 });
 
+describe('divide / fixedGroups（メンバー固定）', () => {
+  it('固定グループのメンバーは必ず同じ班に入る', () => {
+    const src = members(12);
+    const teams = divide(src, 3, { useCore: false, balG: false, fixedGroups: [['0', '1', '2']] });
+    const team = teams.find((t) => t.some((m) => m.id === '0'));
+    expect(team).toBeDefined();
+    expect(team!.some((m) => m.id === '1')).toBe(true);
+    expect(team!.some((m) => m.id === '2')).toBe(true);
+  });
+
+  it('複数の固定グループがそれぞれ同じ班にまとまる', () => {
+    const src = members(12);
+    const teams = divide(src, 3, {
+      useCore: false,
+      balG: false,
+      fixedGroups: [['0', '1'], ['2', '3', '4']],
+    });
+    const findTeam = (id: string) => teams.find((t) => t.some((m) => m.id === id))!;
+    expect(findTeam('0')).toBe(findTeam('1'));
+    expect(findTeam('2')).toBe(findTeam('3'));
+    expect(findTeam('3')).toBe(findTeam('4'));
+  });
+
+  it('固定グループがあっても全員が1度ずつ配置される', () => {
+    const src = members(13);
+    const teams = divide(src, 3, { useCore: false, balG: false, fixedGroups: [['0', '1', '2', '3']] });
+    assertAllPlacedOnce(src, teams);
+  });
+
+  it('固定グループ内の幹部・性別も分散カウントに反映される', () => {
+    const src = [
+      member('c1', 'male', true),
+      member('c2', 'female', true),
+      ...members(10).map((m, i) => ({ ...m, id: `r${i}` })),
+    ];
+    // c1, c2 を固定グループにすると、幹部分散の対象からは外れて同じ班に固まる
+    const teams = divide(src, 3, { useCore: true, balG: false, fixedGroups: [['c1', 'c2']] });
+    const team = teams.find((t) => t.some((m) => m.id === 'c1'))!;
+    expect(team.some((m) => m.id === 'c2')).toBe(true);
+    assertAllPlacedOnce(src, teams);
+  });
+
+  it('存在しないIDや空配列を含む固定グループは無視される', () => {
+    const src = members(9);
+    const teams = divide(src, 3, {
+      useCore: false,
+      balG: false,
+      fixedGroups: [['nope'], [], ['0', '1']],
+    });
+    assertAllPlacedOnce(src, teams);
+    const findTeam = (id: string) => teams.find((t) => t.some((m) => m.id === id))!;
+    expect(findTeam('0')).toBe(findTeam('1'));
+  });
+
+  it('fixedGroups 未指定でも従来どおり動作する', () => {
+    const src = members(9);
+    const teams = divide(src, 3, { useCore: false, balG: false });
+    assertAllPlacedOnce(src, teams);
+    assertBalancedSizes(teams);
+  });
+});
+
 describe('divide / useCore + balG の組み合わせ', () => {
   it('両方オンでも不変条件がすべて成立', () => {
     const src = [

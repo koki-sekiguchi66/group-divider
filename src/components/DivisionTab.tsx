@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { type Member, type DivResult, type DivOptions } from '../types';
+import { type Member, type DivResult, type DivOptions, type FixedGroup } from '../types';
 import { divide } from '../core/divider';
 import { resultContainer, teamCard, chipContainer, chip } from '../ui/anim';
 
@@ -8,7 +8,11 @@ export default function DivisionTab({ members }: { members: Member[] }) {
   const [tc, setTc] = useState(3);
   const [divMode, setDivMode] = useState<'random' | 'core'>('random');
   const [balG, setBalG] = useState(true);
+  const [fixedGroups, setFixedGroups] = useState<FixedGroup[]>([]);
+  const [picking, setPicking] = useState(false);
+  const [pickIds, setPickIds] = useState<string[]>([]);
   const [result, setResult] = useState<DivResult | null>(null);
+  const [lockedIds, setLockedIds] = useState<Set<string>>(new Set());
   const [copied, setCopied] = useState(false);
   // 再シャッフルのたびに増やし、結果ブロックを再マウントして「配り直し」演出を再生する
   const [runId, setRunId] = useState(0);
@@ -16,10 +20,32 @@ export default function DivisionTab({ members }: { members: Member[] }) {
   const present = members.filter(m => m.checkedIn);
   const canDivide = present.length >= tc;
 
+  // メンバーが削除された場合に備え、現存するメンバーだけの固定グループを表示・利用する（2人未満は無効扱い）
+  const activeFixedGroups = fixedGroups
+    .map(g => ({ ...g, memberIds: g.memberIds.filter(id => members.some(m => m.id === id)) }))
+    .filter(g => g.memberIds.length >= 2);
+
+  const groupedIds = new Set(activeFixedGroups.flatMap(g => g.memberIds));
+  const selectableMembers = present.filter(m => !groupedIds.has(m.id));
+
+  const startPicking = () => { setPicking(true); setPickIds([]); };
+  const cancelPicking = () => { setPicking(false); setPickIds([]); };
+  const togglePick = (id: string) => {
+    setPickIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+  const confirmGroup = () => {
+    if (pickIds.length < 2) return;
+    setFixedGroups(prev => [...prev, { id: Math.random().toString(36).slice(2, 10), memberIds: pickIds }]);
+    setPicking(false);
+    setPickIds([]);
+  };
+  const removeGroup = (id: string) => setFixedGroups(prev => prev.filter(g => g.id !== id));
+
   const executeDivide = () => {
     if (!canDivide) return;
-    const opt: DivOptions = { useCore: divMode === 'core', balG };
-    setResult({ teams: divide(present, tc, opt), ...opt });
+    const opt: DivOptions = { useCore: divMode === 'core', balG, fixedGroups: activeFixedGroups.map(g => g.memberIds) };
+    setResult({ teams: divide(present, tc, opt), useCore: opt.useCore, balG: opt.balG });
+    setLockedIds(new Set(groupedIds));
     setCopied(false);
     setRunId(n => n + 1);
   };
@@ -79,6 +105,78 @@ export default function DivisionTab({ members }: { members: Member[] }) {
         </div>
       </div>
 
+      {/* 固定メンバーグループ設定 */}
+      <div className="glass-card rounded-2xl p-4 shadow-sm mb-4">
+        <div className="text-sm font-bold text-gray-600">🔒 固定メンバー（任意）</div>
+        <div className="text-[10px] text-gray-500 mb-3">選んだメンバー同士は必ず同じ班になります。人数によっては班の人数に差が出ることがあります。</div>
+
+        {activeFixedGroups.length > 0 && (
+          <div className="space-y-2 mb-3">
+            <AnimatePresence initial={false}>
+              {activeFixedGroups.map((g, gi) => (
+                <motion.div
+                  key={g.id}
+                  layout
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, x: -16 }}
+                  className="glass-tile p-2.5 rounded-xl flex justify-between items-start gap-2"
+                >
+                  <div className="flex flex-wrap gap-1.5 items-center">
+                    <span className="text-[10px] font-bold text-violet-500">固定{gi + 1}</span>
+                    {g.memberIds.map(id => {
+                      const mem = members.find(m => m.id === id);
+                      const isPresent = present.some(m => m.id === id);
+                      return (
+                        <span key={id} className={`text-xs font-bold px-2 py-0.5 rounded-full ${isPresent ? 'bg-violet-100 text-violet-700' : 'bg-gray-100 text-gray-400 line-through'}`}>
+                          {mem?.name ?? '?'}
+                        </span>
+                      );
+                    })}
+                  </div>
+                  <motion.button whileTap={{ scale: 0.95 }} onClick={() => removeGroup(g.id)} className="text-[10px] font-bold text-red-500 shrink-0 px-2 py-1">解除</motion.button>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+        )}
+
+        {picking ? (
+          <div className="glass-tile p-3 rounded-xl">
+            <div className="text-xs font-bold text-gray-500 mb-2">同じ班にするメンバーを選択（2人以上）</div>
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              {selectableMembers.length === 0 && <div className="text-xs text-gray-400">選択できるメンバーがいません</div>}
+              {selectableMembers.map(m => {
+                const selected = pickIds.includes(m.id);
+                return (
+                  <motion.button
+                    key={m.id}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => togglePick(m.id)}
+                    className={`text-xs font-bold px-2.5 py-1 rounded-full border transition-colors ${selected ? 'bg-violet-500 text-white border-violet-500' : 'bg-white/60 text-gray-600 border-gray-200'}`}
+                  >
+                    {m.name}
+                  </motion.button>
+                );
+              })}
+            </div>
+            <div className="flex gap-2">
+              <motion.button whileTap={{ scale: 0.96 }} onClick={cancelPicking} className="flex-1 btn-glass text-xs font-bold py-2 rounded-lg">キャンセル</motion.button>
+              <motion.button
+                whileTap={pickIds.length >= 2 ? { scale: 0.96 } : undefined}
+                onClick={confirmGroup}
+                disabled={pickIds.length < 2}
+                className={`flex-1 text-xs font-bold py-2 rounded-lg transition-all ${pickIds.length < 2 ? 'bg-gray-300/70 text-white cursor-not-allowed' : 'btn-primary'}`}
+              >
+                この内容で固定する
+              </motion.button>
+            </div>
+          </div>
+        ) : (
+          <motion.button whileTap={{ scale: 0.97 }} onClick={startPicking} className="w-full btn-glass text-xs font-bold py-2.5 rounded-lg">＋ 固定グループを追加</motion.button>
+        )}
+      </div>
+
       <motion.button
         whileTap={canDivide ? { scale: 0.97 } : undefined}
         onClick={executeDivide}
@@ -103,6 +201,7 @@ export default function DivisionTab({ members }: { members: Member[] }) {
                 <motion.div variants={chipContainer} className="flex flex-wrap gap-2">
                   {team.map(m => (
                     <motion.span key={m.id} variants={chip} className="glass-tile px-2.5 py-1 rounded-lg text-sm font-bold text-gray-700">
+                      {lockedIds.has(m.id) && <span className="text-violet-500 mr-1">🔒</span>}
                       {m.core && <span className="text-amber-500 mr-1">★</span>}{m.name}
                     </motion.span>
                   ))}
