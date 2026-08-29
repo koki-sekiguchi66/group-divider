@@ -117,6 +117,13 @@ export default function RegTab({ members, setMembers }: Props) {
     setEditingId(null);
   };
 
+  // 個別削除処理
+  const deleteMember = (m: Member) => {
+    if (!window.confirm(`${m.name}さんを削除しますか？`)) return;
+    setMembers(members.filter(mem => mem.id !== m.id));
+    if (editingId === m.id) setEditingId(null);
+  };
+
   // 登録済みメンバーの共有処理
   const copyShareLink = async () => {
     if (members.length === 0) return alert('共有するメンバーがいません');
@@ -184,6 +191,7 @@ export default function RegTab({ members, setMembers }: Props) {
                     <motion.button whileTap={{ scale: 0.96 }} onClick={() => setEditingId(null)} className="flex-1 btn-glass text-sm font-bold py-1.5 rounded-lg">戻る</motion.button>
                     <motion.button whileTap={{ scale: 0.96 }} onClick={() => saveEdit(m.id)} className="flex-1 btn-primary text-sm font-bold py-1.5 rounded-lg">保存</motion.button>
                   </div>
+                  <motion.button whileTap={{ scale: 0.96 }} onClick={() => deleteMember(m)} className="w-full text-xs font-bold text-red-600 bg-red-100/60 backdrop-blur-sm border border-red-200/50 py-1.5 rounded-lg">削除する</motion.button>
                 </div>
               ) : (
                 <>
@@ -194,7 +202,10 @@ export default function RegTab({ members, setMembers }: Props) {
                     </span>
                     {m.core && <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-100 text-amber-700">★幹部</span>}
                   </div>
-                  <motion.button whileTap={{ scale: 0.95 }} onClick={()=>startEdit(m)} className="glass-tile text-gray-600 text-xs font-bold px-3 py-1.5 rounded-lg">編集</motion.button>
+                  <div className="flex gap-2">
+                    <motion.button whileTap={{ scale: 0.95 }} onClick={()=>startEdit(m)} className="glass-tile text-gray-600 text-xs font-bold px-3 py-1.5 rounded-lg">編集</motion.button>
+                    <motion.button whileTap={{ scale: 0.95 }} onClick={()=>deleteMember(m)} className="text-red-600 bg-red-100/60 backdrop-blur-sm border border-red-200/50 text-xs font-bold px-3 py-1.5 rounded-lg">削除</motion.button>
+                  </div>
                 </>
               )}
             </motion.div>
