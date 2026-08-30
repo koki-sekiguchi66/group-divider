@@ -26,7 +26,7 @@ function pickLeastLoadedTeam(teams: Member[][], score: (team: Member[]) => numbe
 const hasTag = (m: Member, tag: string) => (m.tags ?? []).includes(tag);
 
 export function divide(members: Member[], teamCount: number, options: DivOptions): Member[][] {
-  const { useCore, balG, fixedGroups = [], spreadTags = [] } = options;
+  const { useCore, balG, fixedGroups = [], spreadTags = [], spreadCheckedIn = false } = options;
   const teams: Member[][] = Array.from({ length: teamCount }, () => []);
   const placed = new Set<string>();
 
@@ -59,6 +59,16 @@ export function divide(members: Member[], teamCount: number, options: DivOptions
     const tagged = shuffle(members.filter((m) => !placed.has(m.id) && hasTag(m, tag)));
     for (const m of tagged) {
       const t = pickLeastLoadedTeam(teams, (team) => team.filter((x) => hasTag(x, tag)).length);
+      teams[t].push(m);
+      placed.add(m.id);
+    }
+  }
+
+  // 到着済みメンバーを各班へ分散（未到着者も含めて班分けするモード）
+  if (spreadCheckedIn) {
+    const arrived = shuffle(members.filter((m) => !placed.has(m.id) && m.checkedIn));
+    for (const m of arrived) {
+      const t = pickLeastLoadedTeam(teams, (team) => team.filter((x) => x.checkedIn).length);
       teams[t].push(m);
       placed.add(m.id);
     }

@@ -6,6 +6,8 @@ import { resultContainer, teamCard, chipContainer, chip } from '../ui/anim';
 
 export default function DivisionTab({ members }: { members: Member[] }) {
   const [tc, setTc] = useState(3);
+  // 'present' = 到着済みのみ / 'all' = 登録済み全員（到着済みを各班に分散）
+  const [target, setTarget] = useState<'present' | 'all'>('present');
   const [spreadCore, setSpreadCore] = useState(false);
   const [spreadTags, setSpreadTags] = useState<string[]>([]);
   const [balG, setBalG] = useState(true);
@@ -14,12 +16,16 @@ export default function DivisionTab({ members }: { members: Member[] }) {
   const [pickIds, setPickIds] = useState<string[]>([]);
   const [result, setResult] = useState<DivResult | null>(null);
   const [lockedIds, setLockedIds] = useState<Set<string>>(new Set());
+  // 生成時に「登録済み全員」モードだったか（結果表示で未着を区別するために保持）
+  const [resultShowArrival, setResultShowArrival] = useState(false);
   const [copied, setCopied] = useState(false);
   // 再シャッフルのたびに増やし、結果ブロックを再マウントして「配り直し」演出を再生する
   const [runId, setRunId] = useState(0);
 
   const present = members.filter(m => m.checkedIn);
-  const canDivide = present.length >= tc;
+  // 班分けの対象メンバー（モードによって到着済みのみ／登録済み全員が切り替わる）
+  const targetMembers = target === 'all' ? members : present;
+  const canDivide = targetMembers.length >= tc;
 
   // メンバーが削除された場合に備え、現存するメンバーだけの固定グループを表示・利用する（2人未満は無効扱い）
   const activeFixedGroups = fixedGroups
@@ -27,7 +33,7 @@ export default function DivisionTab({ members }: { members: Member[] }) {
     .filter(g => g.memberIds.length >= 2);
 
   const groupedIds = new Set(activeFixedGroups.flatMap(g => g.memberIds));
-  const selectableMembers = present.filter(m => !groupedIds.has(m.id));
+  const selectableMembers = targetMembers.filter(m => !groupedIds.has(m.id));
 
   // 登録済みメンバーに実際に付いているタグだけを分散対象の候補にする
   const allTags = Array.from(new Set(members.flatMap(m => m.tags ?? []))).sort();
@@ -55,16 +61,20 @@ export default function DivisionTab({ members }: { members: Member[] }) {
       balG,
       fixedGroups: activeFixedGroups.map(g => g.memberIds),
       spreadTags: activeSpreadTags,
+      spreadCheckedIn: target === 'all',
     };
-    setResult({ teams: divide(present, tc, opt), useCore: opt.useCore, balG: opt.balG });
+    setResult({ teams: divide(targetMembers, tc, opt), useCore: opt.useCore, balG: opt.balG });
     setLockedIds(new Set(groupedIds));
+    setResultShowArrival(target === 'all');
     setCopied(false);
     setRunId(n => n + 1);
   };
 
   const copyForLine = async () => {
     if (!result) return;
-    const txt = result.teams.map((t, i) => `【${i + 1}班】(${t.length}人)\n${t.map(m => m.name).join('\n')}`).join('\n\n');
+    const txt = result.teams.map((t, i) =>
+      `【${i + 1}班】(${t.length}人)\n${t.map(m => resultShowArrival && !m.checkedIn ? `${m.name}（未着）` : m.name).join('\n')}`
+    ).join('\n\n');
     try {
       await navigator.clipboard.writeText(txt);
       setCopied(true);
@@ -77,6 +87,17 @@ export default function DivisionTab({ members }: { members: Member[] }) {
       <h2 className="text-lg font-bold mb-3 text-gray-800">グループ分け</h2>
 
       <div className="glass-card rounded-2xl p-4 shadow-sm mb-4">
+        <div className="text-sm font-bold text-gray-600 mb-2">対象メンバー</div>
+        <div className="flex bg-white/40 backdrop-blur-md border border-white/50 rounded-xl p-1 mb-1">
+          <button onClick={() => setTarget('present')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${target === 'present' ? 'bg-white/90 text-emerald-600 shadow-sm' : 'text-gray-500'}`}>✅ 到着済みのみ</button>
+          <button onClick={() => setTarget('all')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${target === 'all' ? 'bg-white/90 text-emerald-600 shadow-sm' : 'text-gray-500'}`}>👥 登録済み全員</button>
+        </div>
+        <div className="text-[10px] text-gray-500 mb-4">
+          {target === 'all'
+            ? `未到着の人も含めて班分けします（対象 ${members.length}人／到着済み ${present.length}人）。到着済みの人が各班に散らばるように配置してから、残りをランダムに割り振ります。`
+            : `到着済みの ${present.length}人だけで班分けします。`}
+        </div>
+
         <div className="flex justify-between items-center mb-4">
           <div className="text-sm font-bold text-gray-600">作る班の数</div>
           <div className="flex items-center gap-3">
@@ -235,15 +256,22 @@ export default function DivisionTab({ members }: { members: Member[] }) {
           >
             {result.teams.map((team, i) => (
               <motion.div key={i} variants={teamCard} className="glass-card rounded-2xl p-4">
-                <div className="font-black text-emerald-700 mb-2">{i + 1}班 <span className="text-xs text-gray-400">({team.length}人)</span></div>
+                <div className="font-black text-emerald-700 mb-2">
+                  {i + 1}班 <span className="text-xs text-gray-400">({team.length}人{resultShowArrival && `／到着 ${team.filter(m => m.checkedIn).length}人`})</span>
+                </div>
                 <motion.div variants={chipContainer} className="flex flex-wrap gap-2">
                   {team.map(m => (
-                    <motion.span key={m.id} variants={chip} className="glass-tile px-2.5 py-1 rounded-lg text-sm font-bold text-gray-700">
+                    <motion.span
+                      key={m.id}
+                      variants={chip}
+                      className={`glass-tile px-2.5 py-1 rounded-lg text-sm font-bold ${resultShowArrival && !m.checkedIn ? 'text-gray-400 border border-dashed border-gray-300' : 'text-gray-700'}`}
+                    >
                       {lockedIds.has(m.id) && <span className="text-violet-500 mr-1">🔒</span>}
                       {m.core && <span className="text-amber-500 mr-1">★</span>}{m.name}
                       {(m.tags ?? []).filter(t => activeSpreadTags.includes(t)).map(t => (
                         <span key={t} className="ml-1 text-[10px] font-bold text-violet-600">{t}</span>
                       ))}
+                      {resultShowArrival && !m.checkedIn && <span className="ml-1 text-[10px] font-bold text-gray-400">未着</span>}
                     </motion.span>
                   ))}
                 </motion.div>

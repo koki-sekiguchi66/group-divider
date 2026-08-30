@@ -320,6 +320,80 @@ describe('divide / spreadTags（タグ分散）', () => {
   });
 });
 
+describe('divide / spreadCheckedIn（到着済みを分散）', () => {
+  const arrived = (id: string, checkedIn: boolean): Member => ({ ...member(id), checkedIn });
+
+  it('到着済み数 === 班数 → 各班にちょうど1人の到着済み', () => {
+    const src = [
+      arrived('a1', true), arrived('a2', true), arrived('a3', true),
+      arrived('n1', false), arrived('n2', false), arrived('n3', false),
+    ];
+    const teams = divide(src, 3, { useCore: false, balG: false, spreadCheckedIn: true });
+    teams.forEach((t) => {
+      expect(t.filter((m) => m.checkedIn)).toHaveLength(1);
+    });
+  });
+
+  it('到着済みが割り切れない場合も班ごとの差は1以下', () => {
+    // 到着済み 7 + 未着 5 = 12人, 3班
+    const src = [
+      ...Array.from({ length: 7 }, (_, i) => arrived(`a${i}`, true)),
+      ...Array.from({ length: 5 }, (_, i) => arrived(`n${i}`, false)),
+    ];
+    const teams = divide(src, 3, { useCore: false, balG: false, spreadCheckedIn: true });
+    const counts = teams.map((t) => t.filter((m) => m.checkedIn).length);
+    expect(Math.max(...counts) - Math.min(...counts)).toBeLessThanOrEqual(1);
+    assertAllPlacedOnce(src, teams);
+    assertBalancedSizes(teams);
+  });
+
+  it('未到着メンバーも班分けの対象に含まれる', () => {
+    const src = [
+      arrived('a1', true), arrived('a2', true),
+      arrived('n1', false), arrived('n2', false), arrived('n3', false), arrived('n4', false),
+    ];
+    const teams = divide(src, 2, { useCore: false, balG: false, spreadCheckedIn: true });
+    assertAllPlacedOnce(src, teams);
+    expect(teams.flat().filter((m) => !m.checkedIn)).toHaveLength(4);
+  });
+
+  it('全員未到着でも不変条件を満たす', () => {
+    const src = Array.from({ length: 9 }, (_, i) => arrived(`n${i}`, false));
+    const teams = divide(src, 3, { useCore: false, balG: false, spreadCheckedIn: true });
+    assertAllPlacedOnce(src, teams);
+    assertBalancedSizes(teams);
+  });
+
+  it('spreadCheckedIn が false なら到着状況は考慮されない', () => {
+    const src = [
+      ...Array.from({ length: 3 }, (_, i) => arrived(`a${i}`, true)),
+      ...Array.from({ length: 6 }, (_, i) => arrived(`n${i}`, false)),
+    ];
+    const teams = divide(src, 3, { useCore: false, balG: false });
+    assertAllPlacedOnce(src, teams);
+    assertBalancedSizes(teams);
+  });
+
+  it('固定グループ・幹部分散と併用しても不変条件を満たす', () => {
+    const src = [
+      { ...member('c1', 'male', true), checkedIn: true },
+      { ...member('c2', 'female', true), checkedIn: false },
+      ...Array.from({ length: 5 }, (_, i) => arrived(`a${i}`, true)),
+      ...Array.from({ length: 5 }, (_, i) => arrived(`n${i}`, false)),
+    ];
+    const teams = divide(src, 3, {
+      useCore: true,
+      balG: true,
+      spreadCheckedIn: true,
+      fixedGroups: [['a0', 'n0']],
+    });
+    assertAllPlacedOnce(src, teams);
+    assertBalancedSizes(teams);
+    const team = teams.find((t) => t.some((m) => m.id === 'a0'))!;
+    expect(team.some((m) => m.id === 'n0')).toBe(true);
+  });
+});
+
 describe('divide / useCore + balG の組み合わせ', () => {
   it('両方オンでも不変条件がすべて成立', () => {
     const src = [

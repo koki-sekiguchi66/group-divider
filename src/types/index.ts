@@ -22,6 +22,8 @@ export interface DivOptions {
   fixedGroups?: string[][];
   /** 各班にできるだけ散らばらせたいタグ */
   spreadTags?: string[];
+  /** 到着済みメンバーを各班に散らばらせる（登録済み全員を対象にするモード用） */
+  spreadCheckedIn?: boolean;
 }
 
 export interface DivResult {
