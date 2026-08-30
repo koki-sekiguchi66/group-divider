@@ -32,6 +32,10 @@ export default function RegTab({ members, setMembers }: Props) {
   const [newGender, setNewGender] = useState<Gender>('male');
   const [newCore, setNewCore] = useState(false);
 
+  // 複数選択削除用のState
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
   // CSVインポート処理
   const handleCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -124,6 +128,27 @@ export default function RegTab({ members, setMembers }: Props) {
     if (editingId === m.id) setEditingId(null);
   };
 
+  // 複数選択削除処理
+  const startSelectMode = () => { setSelectMode(true); setSelectedIds(new Set()); setEditingId(null); };
+  const cancelSelectMode = () => { setSelectMode(false); setSelectedIds(new Set()); };
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const toggleSelectAll = () => {
+    setSelectedIds(prev => prev.size === members.length ? new Set() : new Set(members.map(m => m.id)));
+  };
+  const deleteSelected = () => {
+    if (selectedIds.size === 0) return;
+    if (!window.confirm(`選択した${selectedIds.size}人を削除しますか？`)) return;
+    setMembers(members.filter(m => !selectedIds.has(m.id)));
+    setSelectMode(false);
+    setSelectedIds(new Set());
+  };
+
   // 登録済みメンバーの共有処理
   const copyShareLink = async () => {
     if (members.length === 0) return alert('共有するメンバーがいません');
@@ -164,8 +189,30 @@ export default function RegTab({ members, setMembers }: Props) {
       {/* メンバーリストヘッダー */}
       <div className="flex justify-between items-center mb-2">
         <div className="text-sm font-bold text-gray-600">登録済み： {members.length}人</div>
-        {members.length > 0 && <motion.button whileTap={{ scale: 0.95 }} onClick={() => {if(window.confirm('全員削除しますか？')) setMembers([])}} className="text-xs font-bold text-red-600 bg-red-100/60 backdrop-blur-sm border border-red-200/50 px-2.5 py-1.5 rounded-lg">全員削除</motion.button>}
+        {members.length > 0 && (
+          selectMode
+            ? <motion.button whileTap={{ scale: 0.95 }} onClick={cancelSelectMode} className="text-xs font-bold text-gray-600 glass-tile px-2.5 py-1.5 rounded-lg">キャンセル</motion.button>
+            : <motion.button whileTap={{ scale: 0.95 }} onClick={startSelectMode} className="text-xs font-bold text-red-600 bg-red-100/60 backdrop-blur-sm border border-red-200/50 px-2.5 py-1.5 rounded-lg">選択して削除</motion.button>
+        )}
       </div>
+
+      {/* 選択削除ツールバー */}
+      {selectMode && (
+        <div className="glass-tile rounded-xl p-3 mb-2 flex justify-between items-center">
+          <label className="flex items-center gap-2 text-xs font-bold text-gray-600 cursor-pointer">
+            <input type="checkbox" checked={selectedIds.size > 0 && selectedIds.size === members.length} onChange={toggleSelectAll} className="w-4 h-4 accent-red-600"/>
+            全選択（{selectedIds.size}/{members.length}）
+          </label>
+          <motion.button
+            whileTap={selectedIds.size > 0 ? { scale: 0.95 } : undefined}
+            onClick={deleteSelected}
+            disabled={selectedIds.size === 0}
+            className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${selectedIds.size > 0 ? 'text-white bg-red-600' : 'bg-gray-300/70 text-white cursor-not-allowed'}`}
+          >
+            選択した{selectedIds.size}人を削除
+          </motion.button>
+        </div>
+      )}
 
       {/* メンバーリスト本体 */}
       <div className="space-y-2">
@@ -178,7 +225,8 @@ export default function RegTab({ members, setMembers }: Props) {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, x: -24, scale: 0.9 }}
               transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-              className="glass-card rounded-2xl p-3 flex justify-between items-center"
+              className={`glass-card rounded-2xl p-3 flex justify-between items-center ${selectMode ? 'cursor-pointer' : ''}`}
+              onClick={selectMode ? () => toggleSelect(m.id) : undefined}
             >
               {editingId === m.id ? (
                 <div className="w-full space-y-3">
@@ -196,16 +244,27 @@ export default function RegTab({ members, setMembers }: Props) {
               ) : (
                 <>
                   <div className="flex items-center gap-2">
+                    {selectMode && (
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(m.id)}
+                        onChange={() => toggleSelect(m.id)}
+                        onClick={e => e.stopPropagation()}
+                        className="w-4 h-4 accent-red-600"
+                      />
+                    )}
                     <span className="font-bold">{m.name}</span>
                     <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${m.gender==='male'?'bg-blue-100 text-blue-700':m.gender==='female'?'bg-pink-100 text-pink-700':'bg-gray-100 text-gray-600'}`}>
                       {m.gender==='male'?'男':m.gender==='female'?'女':'他'}
                     </span>
                     {m.core && <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-100 text-amber-700">★幹部</span>}
                   </div>
-                  <div className="flex gap-2">
-                    <motion.button whileTap={{ scale: 0.95 }} onClick={()=>startEdit(m)} className="glass-tile text-gray-600 text-xs font-bold px-3 py-1.5 rounded-lg">編集</motion.button>
-                    <motion.button whileTap={{ scale: 0.95 }} onClick={()=>deleteMember(m)} className="text-red-600 bg-red-100/60 backdrop-blur-sm border border-red-200/50 text-xs font-bold px-3 py-1.5 rounded-lg">削除</motion.button>
-                  </div>
+                  {!selectMode && (
+                    <div className="flex gap-2">
+                      <motion.button whileTap={{ scale: 0.95 }} onClick={()=>startEdit(m)} className="glass-tile text-gray-600 text-xs font-bold px-3 py-1.5 rounded-lg">編集</motion.button>
+                      <motion.button whileTap={{ scale: 0.95 }} onClick={()=>deleteMember(m)} className="text-red-600 bg-red-100/60 backdrop-blur-sm border border-red-200/50 text-xs font-bold px-3 py-1.5 rounded-lg">削除</motion.button>
+                    </div>
+                  )}
                 </>
               )}
             </motion.div>
