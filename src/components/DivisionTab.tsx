@@ -6,7 +6,8 @@ import { resultContainer, teamCard, chipContainer, chip } from '../ui/anim';
 
 export default function DivisionTab({ members }: { members: Member[] }) {
   const [tc, setTc] = useState(3);
-  const [divMode, setDivMode] = useState<'random' | 'core'>('random');
+  const [spreadCore, setSpreadCore] = useState(false);
+  const [spreadTags, setSpreadTags] = useState<string[]>([]);
   const [balG, setBalG] = useState(true);
   const [fixedGroups, setFixedGroups] = useState<FixedGroup[]>([]);
   const [picking, setPicking] = useState(false);
@@ -28,6 +29,12 @@ export default function DivisionTab({ members }: { members: Member[] }) {
   const groupedIds = new Set(activeFixedGroups.flatMap(g => g.memberIds));
   const selectableMembers = present.filter(m => !groupedIds.has(m.id));
 
+  // 登録済みメンバーに実際に付いているタグだけを分散対象の候補にする
+  const allTags = Array.from(new Set(members.flatMap(m => m.tags ?? []))).sort();
+  const activeSpreadTags = spreadTags.filter(t => allTags.includes(t));
+  const toggleSpreadTag = (tag: string) =>
+    setSpreadTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+
   const startPicking = () => { setPicking(true); setPickIds([]); };
   const cancelPicking = () => { setPicking(false); setPickIds([]); };
   const togglePick = (id: string) => {
@@ -43,7 +50,12 @@ export default function DivisionTab({ members }: { members: Member[] }) {
 
   const executeDivide = () => {
     if (!canDivide) return;
-    const opt: DivOptions = { useCore: divMode === 'core', balG, fixedGroups: activeFixedGroups.map(g => g.memberIds) };
+    const opt: DivOptions = {
+      useCore: spreadCore,
+      balG,
+      fixedGroups: activeFixedGroups.map(g => g.memberIds),
+      spreadTags: activeSpreadTags,
+    };
     setResult({ teams: divide(present, tc, opt), useCore: opt.useCore, balG: opt.balG });
     setLockedIds(new Set(groupedIds));
     setCopied(false);
@@ -87,10 +99,36 @@ export default function DivisionTab({ members }: { members: Member[] }) {
           </div>
         </div>
 
-        <div className="text-sm font-bold text-gray-600 mb-2">分散モード</div>
-        <div className="flex bg-white/40 backdrop-blur-md border border-white/50 rounded-xl p-1 mb-5">
-          <button onClick={() => setDivMode('random')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${divMode === 'random' ? 'bg-white/90 text-emerald-600 shadow-sm' : 'text-gray-500'}`}>🎲 全員ランダム</button>
-          <button onClick={() => setDivMode('core')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${divMode === 'core' ? 'bg-white/90 text-emerald-600 shadow-sm' : 'text-gray-500'}`}>👑 幹部を分散</button>
+        <div className="text-sm font-bold text-gray-600 mb-1">分散させるタグ</div>
+        <div className="text-[10px] text-gray-500 mb-2">
+          {spreadCore || activeSpreadTags.length > 0
+            ? '選んだタグの人が各班に散らばるように配置します'
+            : '何も選ばなければ 🎲 全員ランダムで配置します'}
+        </div>
+        <div className="flex flex-wrap gap-1.5 mb-5">
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setSpreadCore(v => !v)}
+            className={`text-xs font-bold px-3 py-1.5 rounded-full border transition-colors ${spreadCore ? 'bg-amber-500 text-white border-amber-500' : 'bg-white/60 text-gray-600 border-gray-200'}`}
+          >
+            ★幹部
+          </motion.button>
+          {allTags.map(tag => {
+            const on = activeSpreadTags.includes(tag);
+            return (
+              <motion.button
+                key={tag}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => toggleSpreadTag(tag)}
+                className={`text-xs font-bold px-3 py-1.5 rounded-full border transition-colors ${on ? 'bg-violet-500 text-white border-violet-500' : 'bg-white/60 text-gray-600 border-gray-200'}`}
+              >
+                {tag}
+              </motion.button>
+            );
+          })}
+          {allTags.length === 0 && (
+            <span className="text-[10px] text-gray-400 py-1.5">「登録」タブでタグを付けるとここに表示されます</span>
+          )}
         </div>
 
         <div className="flex justify-between items-center glass-tile p-3 rounded-xl">
@@ -203,6 +241,9 @@ export default function DivisionTab({ members }: { members: Member[] }) {
                     <motion.span key={m.id} variants={chip} className="glass-tile px-2.5 py-1 rounded-lg text-sm font-bold text-gray-700">
                       {lockedIds.has(m.id) && <span className="text-violet-500 mr-1">🔒</span>}
                       {m.core && <span className="text-amber-500 mr-1">★</span>}{m.name}
+                      {(m.tags ?? []).filter(t => activeSpreadTags.includes(t)).map(t => (
+                        <span key={t} className="ml-1 text-[10px] font-bold text-violet-600">{t}</span>
+                      ))}
                     </motion.span>
                   ))}
                 </motion.div>

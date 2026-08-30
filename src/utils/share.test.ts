@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import LZString from 'lz-string';
 import { encodeMembersToUrl, decodeMembersFromUrl } from './share';
 import { type Member } from '../types';
 
@@ -117,6 +118,34 @@ describe('encode → decode ラウンドトリップ', () => {
     const decoded = decodeMembersFromUrl();
     expect(decoded).not.toBeNull();
     expect(decoded!).toHaveLength(0);
+  });
+
+  it('タグが復元される', () => {
+    const withTags: Member[] = [
+      { id: '1', name: '田中', gender: 'male', core: false, checkedIn: false, tags: ['肉奉行', 'ドライバー'] },
+      { id: '2', name: '鈴木', gender: 'female', core: true, checkedIn: false, tags: [] },
+      { id: '3', name: '佐藤', gender: 'other', core: false, checkedIn: false },
+    ];
+    const url = encodeMembersToUrl(withTags);
+    applyUrl(url);
+
+    const decoded = decodeMembersFromUrl()!;
+    expect(decoded[0].tags).toEqual(['肉奉行', 'ドライバー']);
+    expect(decoded[1].tags).toEqual([]);
+    expect(decoded[2].tags).toEqual([]);
+  });
+
+  it('タグを持たない旧形式のデータも読み込める', () => {
+    // タグ導入前の [名前, 性別番号, 幹部フラグ] 形式
+    const legacy = LZString.compressToEncodedURIComponent(JSON.stringify([['田中', 0, 1]]));
+    window.history.pushState({}, '', `?data=${legacy}`);
+
+    const decoded = decodeMembersFromUrl()!;
+    expect(decoded).toHaveLength(1);
+    expect(decoded[0].name).toBe('田中');
+    expect(decoded[0].gender).toBe('male');
+    expect(decoded[0].core).toBe(true);
+    expect(decoded[0].tags).toEqual([]);
   });
 
   it('大人数（30人）でもラウンドトリップが成立する', () => {

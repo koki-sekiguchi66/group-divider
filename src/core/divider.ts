@@ -23,8 +23,10 @@ function pickLeastLoadedTeam(teams: Member[][], score: (team: Member[]) => numbe
   return best;
 }
 
+const hasTag = (m: Member, tag: string) => (m.tags ?? []).includes(tag);
+
 export function divide(members: Member[], teamCount: number, options: DivOptions): Member[][] {
-  const { useCore, balG, fixedGroups = [] } = options;
+  const { useCore, balG, fixedGroups = [], spreadTags = [] } = options;
   const teams: Member[][] = Array.from({ length: teamCount }, () => []);
   const placed = new Set<string>();
 
@@ -42,11 +44,9 @@ export function divide(members: Member[], teamCount: number, options: DivOptions
     remaining.forEach((m) => placed.add(m.id));
   }
 
-  const rest = members.filter((m) => !placed.has(m.id));
-
   // 幹部を各班に分散
   if (useCore) {
-    const coreMembers = shuffle(rest.filter((m) => m.core));
+    const coreMembers = shuffle(members.filter((m) => !placed.has(m.id) && m.core));
     for (const m of coreMembers) {
       const t = pickLeastLoadedTeam(teams, (team) => team.filter((x) => x.core).length);
       teams[t].push(m);
@@ -54,7 +54,17 @@ export function divide(members: Member[], teamCount: number, options: DivOptions
     }
   }
 
-  const remainder = rest.filter((m) => !placed.has(m.id));
+  // 指定タグごとに各班へ分散
+  for (const tag of spreadTags) {
+    const tagged = shuffle(members.filter((m) => !placed.has(m.id) && hasTag(m, tag)));
+    for (const m of tagged) {
+      const t = pickLeastLoadedTeam(teams, (team) => team.filter((x) => hasTag(x, tag)).length);
+      teams[t].push(m);
+      placed.add(m.id);
+    }
+  }
+
+  const remainder = members.filter((m) => !placed.has(m.id));
 
   // 男女均等
   if (balG) {

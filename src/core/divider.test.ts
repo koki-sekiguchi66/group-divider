@@ -236,6 +236,90 @@ describe('divide / fixedGroups（メンバー固定）', () => {
   });
 });
 
+describe('divide / spreadTags（タグ分散）', () => {
+  const tagged = (id: string, tags: string[]): Member => ({ ...member(id), tags });
+
+  it('タグ付きメンバー数 === 班数 → 各班にちょうど1人', () => {
+    const src = [
+      tagged('t1', ['肉奉行']),
+      tagged('t2', ['肉奉行']),
+      tagged('t3', ['肉奉行']),
+      ...members(9).map((m, i) => ({ ...m, id: `r${i}` })),
+    ];
+    const teams = divide(src, 3, { useCore: false, balG: false, spreadTags: ['肉奉行'] });
+    teams.forEach((t) => {
+      expect(t.filter((m) => (m.tags ?? []).includes('肉奉行'))).toHaveLength(1);
+    });
+  });
+
+  it('複数タグを同時に分散できる', () => {
+    const src = [
+      tagged('n1', ['肉奉行']),
+      tagged('n2', ['肉奉行']),
+      tagged('d1', ['ドライバー']),
+      tagged('d2', ['ドライバー']),
+      ...members(8).map((m, i) => ({ ...m, id: `r${i}` })),
+    ];
+    const teams = divide(src, 2, { useCore: false, balG: false, spreadTags: ['肉奉行', 'ドライバー'] });
+    teams.forEach((t) => {
+      expect(t.filter((m) => (m.tags ?? []).includes('肉奉行'))).toHaveLength(1);
+      expect(t.filter((m) => (m.tags ?? []).includes('ドライバー'))).toHaveLength(1);
+    });
+  });
+
+  it('複数タグを持つメンバーも1度だけ配置される', () => {
+    const src = [
+      tagged('both', ['肉奉行', 'ドライバー']),
+      ...members(8).map((m, i) => ({ ...m, id: `r${i}` })),
+    ];
+    const teams = divide(src, 3, { useCore: false, balG: false, spreadTags: ['肉奉行', 'ドライバー'] });
+    assertAllPlacedOnce(src, teams);
+  });
+
+  it('幹部分散とタグ分散を併用しても不変条件を満たす', () => {
+    const src = [
+      { ...member('c1', 'male', true), tags: ['肉奉行'] },
+      { ...member('c2', 'female', true), tags: [] },
+      tagged('t1', ['肉奉行']),
+      ...members(9).map((m, i) => ({ ...m, id: `r${i}` })),
+    ];
+    const teams = divide(src, 3, { useCore: true, balG: true, spreadTags: ['肉奉行'] });
+    assertAllPlacedOnce(src, teams);
+    assertBalancedSizes(teams);
+  });
+
+  it('tags 未設定のメンバーが混ざっていてもエラーにならない', () => {
+    const src = [tagged('t1', ['肉奉行']), ...members(8).map((m, i) => ({ ...m, id: `r${i}` }))];
+    const teams = divide(src, 3, { useCore: false, balG: false, spreadTags: ['肉奉行'] });
+    assertAllPlacedOnce(src, teams);
+    assertBalancedSizes(teams);
+  });
+
+  it('存在しないタグを指定しても通常配置になる', () => {
+    const src = members(9);
+    const teams = divide(src, 3, { useCore: false, balG: false, spreadTags: ['未使用タグ'] });
+    assertAllPlacedOnce(src, teams);
+    assertBalancedSizes(teams);
+  });
+
+  it('固定グループのメンバーはタグ分散より固定が優先される', () => {
+    const src = [
+      tagged('t1', ['肉奉行']),
+      tagged('t2', ['肉奉行']),
+      ...members(8).map((m, i) => ({ ...m, id: `r${i}` })),
+    ];
+    const teams = divide(src, 3, {
+      useCore: false,
+      balG: false,
+      spreadTags: ['肉奉行'],
+      fixedGroups: [['t1', 't2']],
+    });
+    const team = teams.find((t) => t.some((m) => m.id === 't1'))!;
+    expect(team.some((m) => m.id === 't2')).toBe(true);
+    assertAllPlacedOnce(src, teams);
+  });
+});
+
 describe('divide / useCore + balG の組み合わせ', () => {
   it('両方オンでも不変条件がすべて成立', () => {
     const src = [
